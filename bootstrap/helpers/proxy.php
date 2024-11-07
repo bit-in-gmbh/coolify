@@ -189,7 +189,6 @@ function generate_default_proxy_configuration(Server $server)
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http3',
-                        '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',
                         '--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
@@ -205,12 +204,15 @@ function generate_default_proxy_configuration(Server $server)
             $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
         }
+        // FIXME: if traefik should only be deployed on the manager this has to be changed to isSwarmManager
+        // and it needs to be ensured that the proxy is not deployed at worker nodes
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
             data_forget($config, 'services.traefik.restart');
             data_forget($config, 'services.traefik.labels');
-
-            $config['services']['traefik']['command'][] = '--providers.docker.swarmMode=true';
+            
+            $config['services']['traefik']['command'][] = '--providers.swarm.endpoint=unix:///var/run/docker.sock';
+            $config['services']['traefik']['command'][] = '--providers.swarm.exposedbydefault=false';
             $config['services']['traefik']['deploy'] = [
                 'labels' => $labels,
                 'placement' => [
@@ -221,6 +223,7 @@ function generate_default_proxy_configuration(Server $server)
             ];
         } else {
             $config['services']['traefik']['command'][] = '--providers.docker=true';
+            $config['services']['traefik']['command'][] = '--providers.docker.exposedbydefault=false';
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
